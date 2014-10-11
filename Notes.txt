@@ -1,0 +1,74 @@
+The intent here is to split my service across two different Nancy "servers."
+
+- "Api" will just contain our API methods.
+- "Site" will just provide content.
+
+If Site just provides content, it seems prima facie like we don't really need
+much of a web server.  Why not create a basic web site?  The answer is: we 
+might want routing, templating, and bundling, and to get that, we need to be
+running something -- even if it's just command line minification, etc.
+
+To get them both running, I did the following:
+
+1. Right-clicked the solution to select them both as startup projects.
+2. Went into the properties for Api and:
+   A. Set its IIS Express project URL's port number to 12001
+   B. Set its start action to "not open a page" 
+2. Went into the properties for Site and set its IIS Express project URL's port
+   number to 12002.
+
+Because of the usual stubborness of IIS Express, I had to reopen my solution in
+order to get debugging working properly.
+
+Then I started working on Site.  I started by scripts down from nuget: jQuery, 
+underscore.  The plan was to get bundling working, which I'd done in ASP.NET MVC,
+but never with Nancy.  To do this, I added Microsoft.AspNet.Web.Optimization
+package, which brought with it a number of dependencies.
+
+Before configuring the bundles themselves, I set up a couple of static 
+directories:
+
+- Asset, for my own static resources
+- Scripts, for my nugot libraries
+- Bundles, for bundled resources
+
+Next, I added some of my library scripts to ~/Bundles/js, and a @Path 
+corresponding @Path directive on my index view:
+
+<script type="text/html" src="@Path['~/Bundles/js']"></script>
+
+I then whipped up a really simple script using jQuery and underscore just to
+make sure it was working.  It was.  Time to hook up the API!
+
+First, I created a "proxy service" in JavaScript to represent our API.  This
+is basically just a wrapper for Ajax calls via jQuery.  I added a few methods,and tried them out: no dice!  CORS needed to be enabled on my API.  I did this
+by updating web.config, which I could do only because it's IIS-hosted.
+Otherwise, I would have done it the "long way," by adding Access-Control 
+headers on each response. Adding a couple of custom headers did the trick:
+
+<system.webServer>
+   ...
+   <httpProtocol>
+      <customHeaders>
+         <add name="Access-Control-Allow-Origin" value="http://localhost:12002" />
+         <add name="Access-Control-Allow-Methods" value="GET,PUT,POST,DELETE" />
+      </customHeaders>
+   </httpProtocol>
+</system.webServer>
+
+This worked great, for the most part.  It was only when I prepared my POST
+response that I ran into trouble.  The standard practice when POSTing is to
+return a "Created," along with a Location header.  But by default, CORS 
+prevents this.  You need to explicitly allow "non-simple response" headers,
+namely those which are not: Cache-Control, Content-Language, Content-Type,
+Expires, Last-Modified, and Pragma. 
+
+While I could have done this in my web.config (like I did with the others)
+it seemed excessive -- headers mean overhead, and there's just no reason
+to provide a Location header in response to a GET.  So I just added some
+code to my POST handler:
+
+   result.Headers.Add("Location", this.Context.Request.Url + "/123");
+   result.Headers.Add("Access-Control-Expose-Headers", "Location");
+
+That did the trick, and with that, my two Nancy servers were chatting happily.

@@ -1,0 +1,43 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<title>Site</title>
+</head>
+<body>
+	This view was rendered using the SuperSimpleViewEngine
+	<script type="text/javascript" src="@Path['~/Bundles/js']"></script>
+	<script type="text/javascript" src="@Path['~/Assets/js/api.js']"></script>
+	<script type="text/javascript">
+		$(document).ready(function () {
+			var api = new API("http://localhost:12001");
+
+			api.GetAList().success(function () {
+				console.log("GOT LIST!", arguments);
+
+				api.GetA(123).success(function () {
+					console.log("GOT ONE!", arguments);
+
+					api.PutA(123, { thing: 1, another: 2 }).success(function () {
+						console.log("PUT!", arguments);
+
+						api.PostA({ what: "who", why: "no clue" }).success(function (data, status, xhr) {
+						    console.log("POST!", arguments, xhr.getResponseHeader("Location"));
+
+							api.DeleteA(321).success(function () {
+								console.log("DELETE!", arguments);
+							});
+						});
+					});
+				});
+			});
+
+			//api.GetAList().success(function () {
+			//	console.log("GOT!", arguments);
+
+
+			//});
+		});
+	</script>
+</body>
+</html>
